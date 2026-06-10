@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <!-- VIEWPORT & FLUID WIDTHS -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Integraly - Interactive Definite Integral Visualizer</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f5f3ff',
+                            100: '#ede9fe',
+                            500: '#8b5cf6',
+                            600: '#7c3aed',
+                            700: '#6d28d9',
+                            900: '#4c1d95',
+                        },
+                        accent: {
+                            500: '#06b6d4',
+                            600: '#0891b2',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- KaTeX CSS & JS for beautiful LaTeX math rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    
+    <!-- Math.js for powerful math parsing and evaluation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.min.js"></script>
+    
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0b0f19;
+        }
+        
+        /* Custom scrollbar for control panels */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #111827;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4b5563;
+        }
+        
+        /* Math display container overrides */
+        .katex-display {
+            margin: 0.5em 0 !important;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+        
+        /* Focus styles for mathematical inputs */
+        .math-input-glow:focus-within {
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.4);
+        }
+    </style>
+</head>
+
+<body class="h-full text-slate-100 flex flex-col overflow-hidden">
+
+    <!-- Top Navigation Header -->
+    <header class="bg-slate-900/80 backdrop-blur border-b border-slate-800 px-6 py-4 flex flex-shrink-0 items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <div class="bg-gradient-to-tr from-brand-600 to-accent-500 p-2.5 rounded-xl shadow-lg shadow-brand-900/30">
+                <!-- SVG Icon representing integration / curve -->
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold bg-gradient-to-r from-brand-100 to-white bg-clip-text text-transparent flex items-center gap-2">
+                    Integraly <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-300 border border-brand-500/30">v1.1</span>
+                </h1>
+                <p class="text-xs text-slate-400">Interactive Definite Integral Visualizer & Approximation Engine</p>
+            </div>
+        </div>
+        
+        <!-- Interactive Mode Badges -->
+        <div class="hidden sm:flex items-center space-x-3 text-xs bg-slate-950 p-1.5 rounded-lg border border-slate-800">
+            <button id="mode-exact" onclick="setApproximationMethod('exact')" class="px-3 py-1.5 rounded-md font-medium transition-all duration-200 bg-brand-600 text-white">
+                Exact Integral
+            </button>
+            <button id="mode-riemann" onclick="setApproximationMethod('left')" class="px-3 py-1.5 rounded-md font-medium transition-all duration-200 text-slate-400 hover:text-white">
+                Riemann Sums
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace Frame -->
+    <main class="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        
+        <!-- Left Side: Interactive Control Panel -->
+        <aside class="w-full lg:w-[460px] bg-slate-900/55 border-r border-slate-800 flex flex-col overflow-y-auto p-6 space-y-6 flex-shrink-0">
+            
+            <!-- SECTION 1: PRESETS & EXPRESSION INPUT -->
+            <div class="bg-slate-950/60 p-5 rounded-2xl border border-slate-800/80 space-y-4 shadow-inner">
+                <div class="flex items-center justify-between">
+                    <label class="text-xs font-semibold tracking-wider text-slate-400 uppercase">1. Function Definition</label>
+                    
+                    <!-- Presets Selector -->
+                    <div class="relative inline-block text-left">
+                        <select id="preset-selector" onchange="loadPreset(this.value)" class="bg-slate-900 text-xs text-brand-300 border border-slate-800 rounded-lg px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-brand-500 cursor-pointer">
+                            <option value="" disabled>-- Load Preset --</option>
+                            <option value="parabola" selected>Parabola: x² - 1</option>
+                            <option value="sine">Sine Wave: 2 * sin(x)</option>
+                            <option value="gaussian">Bell Curve: 3 * e^(-x²)</option>
+                            <option value="cubic">Cubic Wave: 0.1x³ - x</option>
+                            <option value="damped">Damped Oscillation: 3e^(-0.15x) * cos(x)</option>
+                            <option value="polynomial">Polynomial: 0.05x⁴ - x² + 2</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Equation Input Field -->
+                <div class="math-input-glow flex items-center bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 transition-all duration-200">
+                    <span class="text-brand-400 font-semibold mr-2 select-none">f(x) =</span>
+                    <input type="text" id="function-input" value="x^2 - 1" oninput="handleFunctionInput(this.value)" 
+                           class="bg-transparent w-full focus:outline-none text-white text-base font-medium placeholder-slate-600"
+                           placeholder="Type a math function, e.g. x^2 - 1">
+                </div>
+                
+                <!-- Input Parsing Error Alert -->
+                <div id="function-error" class="hidden text-xs text-rose-400 bg-rose-950/40 border border-rose-900/50 p-3 rounded-lg flex items-start gap-2 animate-pulse">
+                    <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                    <span id="error-message">Invalid Syntax</span>
+                </div>
+
+                <!-- Formatted Mathematical Expression using KaTeX -->
+                <div class="bg-slate-900/40 p-3 rounded-xl border border-slate-800/50 flex flex-col items-center justify-center min-h-[60px]">
+                    <div class="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">Parsed LaTeX Preview</div>
+                    <div id="latex-formula" class="text-slate-100 text-lg transition-all duration-300"></div>
+                </div>
+            </div>
+
+            <!-- SECTION 2: INTEGRATION BOUNDS & INTERNALS -->
+            <div class="bg-slate-950/60 p-5 rounded-2xl border border-slate-800/80 space-y-5">
+                <div class="flex items-center justify-between">
+                    <label class="text-xs font-semibold tracking-wider text-slate-400 uppercase">2. Integration Limits</label>
+                    <button onclick="swapLimits()" class="text-xs text-brand-300 hover:text-white flex items-center gap-1 bg-brand-950/40 border border-brand-900/30 px-2 py-1 rounded-md transition duration-150">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                        Swap (a ↔ b)
+                    </button>
+                </div>
+
+                <!-- Bound Slider Control A -->
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="flex items-center gap-1.5 font-medium text-violet-400">
+                            <span class="w-2 h-2 rounded-full bg-violet-400"></span> Lower Bound (a)
+                        </span>
+                        <div class="flex items-center space-x-1 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-lg">
+                            <button onclick="adjustBound('a', -0.1)" class="text-slate-400 hover:text-white px-1 font-bold">-</button>
+                            <input type="number" id="input-a" value="-2.0" step="0.1" onchange="handleBoundNumberInput('a', this.value)" class="bg-transparent w-14 text-center font-semibold text-violet-300 focus:outline-none">
+                            <button onclick="adjustBound('a', 0.1)" class="text-slate-400 hover:text-white px-1 font-bold">+</button>
+                        </div>
+                    </div>
+                    <input type="range" id="slider-a" min="-10" max="10" step="0.05" value="-2.0" oninput="handleBoundSliderInput('a', this.value)" class="w-full accent-violet-500 cursor-ew-resize h-1 bg-slate-800 rounded-lg">
+                </div>
+
+                <!-- Bound Slider Control B -->
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="flex items-center gap-1.5 font-medium text-cyan-400">
+                            <span class="w-2 h-2 rounded-full bg-cyan-400"></span> Upper Bound (b)
+                        </span>
+                        <div class="flex items-center space-x-1 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-lg">
+                            <button onclick="adjustBound('b', -0.1)" class="text-slate-400 hover:text-white px-1 font-bold">-</button>
+                            <input type="number" id="input-b" value="2.0" step="0.1" onchange="handleBoundNumberInput('b', this.value)" class="bg-transparent w-14 text-center font-semibold text-cyan-300 focus:outline-none">
+                            <button onclick="adjustBound('b', 0.1)" class="text-slate-400 hover:text-white px-1 font-bold">+</button>
+                        </div>
+                    </div>
+                    <input type="range" id="slider-b" min="-10" max="10" step="0.05" value="2.0" oninput="handleBoundSliderInput('b', this.value)" class="w-full accent-cyan-500 cursor-ew-resize h-1 bg-slate-800 rounded-lg">
+                </div>
+            </div>
+
+            <!-- SECTION 3: APPROXIMATION CONFIGURATION (HIDDEN BY DEFAULT, VISIBLE ON SELECTION) -->
+            <div id="riemann-config" class="hidden bg-slate-950/60 p-5 rounded-2xl border border-slate-800/80 space-y-4">
+                <label class="text-xs font-semibold tracking-wider text-slate-400 uppercase block">3. Approximation Method</label>
+                
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="setApproximationMethod('left')" id="btn-left-riemann" class="bg-slate-900 border border-slate-800 text-xs font-medium py-2.5 rounded-xl hover:bg-slate-800 transition text-slate-300">
+                        Left Riemann
+                    </button>
+                    <button onclick="setApproximationMethod('right')" id="btn-right-riemann" class="bg-slate-900 border border-slate-800 text-xs font-medium py-2.5 rounded-xl hover:bg-slate-800 transition text-slate-300">
+                        Right Riemann
+                    </button>
+                    <button onclick="setApproximationMethod('midpoint')" id="btn-midpoint-riemann" class="bg-slate-900 border border-slate-800 text-xs font-medium py-2.5 rounded-xl hover:bg-slate-800 transition text-slate-300">
+                        Midpoint Riemann
+                    </button>
+                    <button onclick="setApproximationMethod('trapezoid')" id="btn-trapezoid" class="bg-slate-900 border border-slate-800 text-xs font-medium py-2.5 rounded-xl hover:bg-slate-800 transition text-slate-300">
+                        Trapezoidal Rule
+                    </button>
+                </div>
+
+                <!-- Number of steps / intervals -->
+                <div class="space-y-2 pt-2">
+                    <div class="flex justify-between text-xs font-medium">
+                        <span class="text-slate-400">Subdivisions (n)</span>
+                        <span class="text-brand-300" id="label-intervals">n = 10</span>
+                    </div>
+                    <input type="range" id="slider-n" min="4" max="200" step="1" value="10" oninput="handleIntervalSliderInput(this.value)" class="w-full accent-brand-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg">
+                </div>
+            </div>
+
+            <!-- SECTION 4: LIVE CALCULATIONS RESULTS -->
+            <div class="bg-slate-950/60 p-5 rounded-2xl border border-slate-800/80 space-y-4">
+                <label class="text-xs font-semibold tracking-wider text-slate-400 uppercase block">Calculation Breakdown</label>
+
+                <!-- KaTeX Render of the definite integral -->
+                <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800 flex items-center justify-center text-center overflow-x-auto min-h-[70px]">
+                    <div id="latex-integral" class="text-white text-lg font-medium"></div>
+                </div>
+
+                <div class="space-y-3 pt-2">
+                    <!-- Signed Area (Dynamic Math Result) -->
+                    <div class="flex justify-between items-center bg-slate-900/30 p-3 rounded-xl border border-slate-800/50">
+                        <div>
+                            <span class="text-xs text-slate-400 block font-medium">Signed Area (Integral Value)</span>
+                            <span class="text-[10px] text-slate-500">Positive and negative areas cancel out</span>
+                        </div>
+                        <span id="result-signed-area" class="text-xl font-bold text-emerald-400">0.0000</span>
+                    </div>
+
+                    <!-- Absolute Area (Geometric Result) -->
+                    <div class="flex justify-between items-center bg-slate-900/30 p-3 rounded-xl border border-slate-800/50">
+                        <div>
+                            <span class="text-xs text-slate-400 block font-medium">Absolute Area (Geometric)</span>
+                            <span class="text-[10px] text-slate-500">∫ |f(x)| dx</span>
+                        </div>
+                        <span id="result-absolute-area" class="text-lg font-semibold text-slate-200">0.0000</span>
+                    </div>
+
+                    <!-- Numerical Error Percentage (Visible if approximating) -->
+                    <div id="numerical-error-card" class="hidden flex justify-between items-center bg-brand-950/10 p-3 rounded-xl border border-brand-900/30">
+                        <div>
+                            <span class="text-xs text-brand-300 block font-medium">Approximation Error</span>
+                            <span class="text-[10px] text-slate-400">Deviation from exact calculus</span>
+                        </div>
+                        <div class="text-right">
+                            <span id="result-error-value" class="text-sm font-semibold text-brand-300 block">0.0000</span>
+                            <span id="result-error-percent" class="text-[10px] text-slate-400 block">0.0%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 5: EDUCATIONAL CONTENT / TIPS -->
+            <div class="bg-slate-900/30 p-4 rounded-xl border border-slate-800/60 space-y-2">
+                <h3 class="text-xs font-semibold text-brand-300 flex items-center gap-1.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Operating Tips
+                </h3>
+                <ul class="text-[11px] text-slate-400 space-y-1.5 list-disc list-inside">
+                    <li><strong class="text-slate-200">Interactive Handles:</strong> Drag the labeled flags <span class="text-violet-400 font-bold">a</span> and <span class="text-cyan-400 font-bold">b</span> directly on the graph's horizontal axis!</li>
+                    <li><strong class="text-slate-200">Explore curves:</strong> Left-click and drag the background to pan. Use your mouse scroll-wheel to zoom.</li>
+                    <li><strong class="text-slate-200">Riemann Sums:</strong> Turn on Riemann mode above to compare rectangle approximations with the exact curve integral!</li>
+                </ul>
+            </div>
+            
+            <!-- Footer -->
+            <div class="text-center text-[10px] text-slate-600 pt-2 border-t border-slate-800">
+                Created with precision &bull; Powered by math.js & KaTeX
+            </div>
+
+        </aside>
+
+        <!-- Right Side: Interactive Desmos-like Graphing Canvas -->
+        <section class="flex-1 flex flex-col bg-slate-950 relative h-[45vh] lg:h-full">
+            
+            <!-- Canvas HUD Overlay (Coordinates and Stats) -->
+            <div class="absolute top-4 left-4 z-10 flex flex-wrap gap-2 pointer-events-none select-none">
+                <div class="bg-slate-900/80 backdrop-blur border border-slate-800 px-3 py-1.5 rounded-lg text-xs flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded bg-gradient-to-tr from-violet-500 to-cyan-500"></span>
+                    <span class="text-slate-400">View Span:</span>
+                    <span id="hud-scale-x" class="font-semibold text-slate-200">[-10.0, 10.0]</span>
+                </div>
+                
+                <div id="hud-approximation-badge" class="hidden bg-brand-950/80 backdrop-blur border border-brand-800/80 px-3 py-1.5 rounded-lg text-xs items-center gap-1.5">
+                    <span class="relative flex h-2 w-2">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-2 w-2 bg-brand-500"></span>
+                    </span>
+                    <span class="text-brand-300 font-semibold" id="hud-approx-method-label">Left Riemann Sum</span>
+                </div>
+            </div>
+
+            <!-- Floater Buttons (Zoom Reset, Fit, Controls) -->
+            <div class="absolute bottom-6 right-6 z-10 flex flex-col space-y-2">
+                <button onclick="zoom(1.2)" class="w-10 h-10 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 rounded-xl flex items-center justify-center text-white shadow-xl transition active:scale-95" title="Zoom In">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                </button>
+                <button onclick="zoom(1/1.2)" class="w-10 h-10 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 rounded-xl flex items-center justify-center text-white shadow-xl transition active:scale-95" title="Zoom Out">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
+                </button>
+                <button onclick="resetViewport()" class="w-10 h-10 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 rounded-xl flex items-center justify-center text-white shadow-xl transition active:scale-95" title="Reset/Center Camera">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                </button>
+            </div>
+
+            <!-- Double-click to Reset Note -->
+            <div class="absolute bottom-6 left-6 z-10 pointer-events-none select-none text-[10px] text-slate-500 bg-slate-900/40 px-2 py-1 rounded border border-slate-800/30">
+                Tip: Drag canvas to pan &bull; Scroll to zoom
+            </div>
+
+            <!-- Main Interactive Canvas -->
+            <div class="flex-1 w-full h-full relative overflow-hidden bg-[#0c101b]">
+                <canvas id="graph-canvas" class="block w-full h-full cursor-grab active:cursor-grabbing"></canvas>
+            </div>
+
+        </section>
+    </main>
+
+    <script>
+        // CORE APPLICATION STATE
+        let fExpression = "x^2 - 1";
+        let compiledExpr = null;
+        let limitA = -2.0;
+        let limitB = 2.0;
+        
+        // Approximation options: 'exact', 'left', 'right', 'midpoint', 'trapezoid'
+        let approxMethod = 'exact'; 
+        let subdivisionsN = 10;
+        
+        // Interactive Graph Variables (Camera / Zoom Setup)
+        let centerX = 0.0;
+        let centerY = 0.0;
+        let scaleX = 45.0; // pixels per unit
+        let scaleY = 45.0; // pixels per unit
+        
+        // Canvas & Context references
+        const canvas = document.getElementById('graph-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Interactive drag states
+        let dragTarget = null; // 'a', 'b', or 'viewport'
+        let lastMouseX = 0;
+        let lastMouseY = 0;
+        let hoverTarget = null; // 'a', 'b'
+        let crosshairX = null; // Track current math-X coordinate inspected
+        let crosshairY = null;
+        let mouseInCanvas = false;
+
+        // Color Constants (Premium Palette matching dark theme)
+        const COLORS = {
+            bg: '#0c101b',
+            gridLines: '#171f30',
+            axes: '#334155',
+            text: '#94a3b8',
+            primaryCurve: 'rgba(139, 92, 246, 0.85)', // Violet gradient source
+            primaryCurveEnd: 'rgba(6, 182, 212, 0.85)', // Cyan gradient source
+            exactAreaPos: 'rgba(16, 185, 129, 0.20)', // Emerald trans for + area
+            exactAreaNeg: 'rgba(244, 63, 94, 0.20)', // Rose trans for - area
+            exactAreaPosStroke: 'rgba(16, 185, 129, 0.45)',
+            exactAreaNegStroke: 'rgba(244, 63, 94, 0.45)',
+            riemannAreaPos: 'rgba(6, 182, 212, 0.24)', // Soft glowing cyan
+            riemannAreaNeg: 'rgba(244, 63, 94, 0.24)', // Soft glowing rose
+            riemannStrokePos: 'rgba(6, 182, 212, 0.7)',
+            riemannStrokeNeg: 'rgba(244, 63, 94, 0.7)',
+            limitA: '#a78bfa', // Light violet
+            limitB: '#22d3ee'  // Light cyan
+        };
+
+        // Window load and setup
+        window.addEventListener('load', () => {
+            // Compile default function
+            compileExpression(fExpression);
+            
+            // Adjust canvas to its client space
+            resizeCanvas();
+            
+            // Trigger animation frame calculation loop
+            requestAnimationFrame(renderLoop);
+            
+            // Re-render LaTeX
+            updateLatexFormulaDisplay();
+            recalculateAndRender();
+        });
+
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+        });
+
+        function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            // Get standard device pixel ratio for sharp screens
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            
+            // Match CSS dimensions
+            canvas.style.width = rect.width + 'px';
+            canvas.style.height = rect.height + 'px';
+            
+            requestRedraw();
+        }
+
+        // REDRAW MECHANICS
+        let redrawQueued = true;
+        function requestRedraw() {
+            redrawQueued = true;
+        }
+
+        function renderLoop() {
+            if (redrawQueued) {
+                drawGraph();
+                redrawQueued = false;
+            }
+            requestAnimationFrame(renderLoop);
+        }
+
+        // MATH EXPRESSION HANDLING & EVALUATION
+        function compileExpression(exprStr) {
+            try {
+                // Pre-clean standard inputs
+                let cleanStr = exprStr.trim();
+                
+                // Allow implicit multiplications (e.g. 2x instead of 2*x)
+                const parsed = math.compile(cleanStr);
+                
+                // Verify evaluation with dummy value
+                const test = parsed.evaluate({ x: 1 });
+                if (typeof test !== 'number' && (typeof test !== 'object' || !test.isComplex)) {
+                    throw new Error("Invalid output dimension");
+                }
+                
+                compiledExpr = parsed;
+                document.getElementById('function-input').classList.remove('border-rose-500');
+                document.getElementById('function-error').classList.add('hidden');
+                return true;
+            } catch (e) {
+                compiledExpr = null;
+                document.getElementById('function-input').classList.add('border-rose-500');
+                const errElement = document.getElementById('function-error');
+                const errMsg = document.getElementById('error-message');
+                errMsg.innerText = `${e.message}`;
+                errElement.classList.remove('hidden');
+                return false;
+            }
+        }
+
+        // Safely evaluate f(x) for real values
+        function evalF(x) {
+            if (!compiledExpr) return NaN;
+            try {
+                let val = compiledExpr.evaluate({ x: x });
+                if (typeof val === 'object' && val.isComplex) {
+                    if (val.im === 0) return val.re;
+                    return NaN; // Filter imaginary results
+                }
+                if (typeof val === 'number') {
+                    if (isFinite(val)) return val;
+                }
+                return NaN;
+            } catch (e) {
+                return NaN;
+            }
+        }
+
+        // INTEGRATION SIMULATION ENGINE (High resolution Simpson's Rule for the "Exact" Value)
+        function calculateExactIntegral(a, b, numSteps = 1000) {
+            const h = (b - a) / numSteps;
+            let sumSigned = 0;
+            let sumAbsolute = 0;
+
+            for (let i = 0; i <= numSteps; i++) {
+                const x = a + i * h;
+                const y = evalF(x);
+                if (isNaN(y) || !isFinite(y)) continue;
+
+                // Trapezoidal Weights
+                const weight = (i === 0 || i === numSteps) ? 0.5 : 1.0;
+                sumSigned += weight * y;
+                sumAbsolute += weight * Math.abs(y);
+            }
+
+            return {
+                signed: sumSigned * h,
+                absolute: sumAbsolute * h
+            };
+        }
+
+        // COMPUTE APPROXIMATE RIEMANN SUM VALUES
+        function calculateApproximateIntegral(a, b, method, n) {
+            const h = (b - a) / n;
+            let sum = 0;
+
+            for (let i = 0; i < n; i++) {
+                const x_start = a + i * h;
+                const x_end = a + (i + 1) * h;
+                
+                let evalPoint = x_start; // default left
+                if (method === 'right') {
+                    evalPoint = x_end;
+                } else if (method === 'midpoint') {
+                    evalPoint = x_start + h / 2;
+                } else if (method === 'trapezoid') {
+                    const y1 = evalF(x_start);
+                    const y2 = evalF(x_end);
+                    if (isFinite(y1) && isFinite(y2)) {
+                        sum += 0.5 * (y1 + y2) * h;
+                    }
+                    continue;
+                }
+                
+                const y = evalF(evalPoint);
+                if (isFinite(y)) {
+                    sum += y * h;
+                }
+            }
+            return sum;
+        }
+
+        // RE-CALCULATE AND UPDATE VALUE METRICS
+        function recalculateAndRender() {
+            if (!compiledExpr) return;
+
+            // Perform Calculations
+            const exact = calculateExactIntegral(limitA, limitB);
+            
+            // Display exacts
+            document.getElementById('result-signed-area').innerText = exact.signed.toFixed(5);
+            document.getElementById('result-absolute-area').innerText = exact.absolute.toFixed(5);
+            
+            const errorCard = document.getElementById('numerical-error-card');
+            
+            if (approxMethod !== 'exact') {
+                const approxVal = calculateApproximateIntegral(limitA, limitB, approxMethod, subdivisionsN);
+                const errValue = approxVal - exact.signed;
+                let pctError = 0;
+                
+                if (Math.abs(exact.signed) > 1e-9) {
+                    pctError = (Math.abs(errValue) / Math.abs(exact.signed)) * 100;
+                } else if (Math.abs(approxVal) > 1e-9) {
+                    pctError = 100.0;
+                }
+
+                errorCard.classList.remove('hidden');
+                document.getElementById('result-error-value').innerText = (errValue >= 0 ? "+" : "") + errValue.toFixed(5);
+                document.getElementById('result-error-percent').innerText = pctError.toFixed(2) + "% Error";
+                
+                // Show updated banner badge
+                document.getElementById('hud-approximation-badge').classList.remove('hidden');
+                document.getElementById('hud-approximation-badge').classList.add('flex');
+                
+                let methodLabel = "Riemann Sum";
+                if (approxMethod === 'left') methodLabel = "Left Riemann Sum";
+                if (approxMethod === 'right') methodLabel = "Right Riemann Sum";
+                if (approxMethod === 'midpoint') methodLabel = "Midpoint Riemann Sum";
+                if (approxMethod === 'trapezoid') methodLabel = "Trapezoidal Approximation";
+                document.getElementById('hud-approx-method-label').innerText = methodLabel;
+            } else {
+                errorCard.classList.add('hidden');
+                document.getElementById('hud-approximation-badge').classList.add('hidden');
+                document.getElementById('hud-approximation-badge').classList.remove('flex');
+            }
+
+            // Update LaTeX visual Formula
+            try {
+                const node = math.parse(fExpression);
+                const latex = node.toTex();
+                
+                let integralTexVal = "";
+                if (approxMethod === 'exact') {
+                    integralTexVal = `\\int_{${limitA.toFixed(2)}}^{${limitB.toFixed(2)}} f(x)\\,dx = ${exact.signed.toFixed(4)}`;
+                } else {
+                    const approxVal = calculateApproximateIntegral(limitA, limitB, approxMethod, subdivisionsN);
+                    integralTexVal = `\\int_{${limitA.toFixed(2)}}^{${limitB.toFixed(2)}} f(x)\\,dx \\approx ${approxVal.toFixed(4)}`;
+                }
+                
+                katex.render(integralTexVal, document.getElementById('latex-integral'), {
+                    throwOnError: false,
+                    displayMode: true
+                });
+            } catch (e) {
+                // Fallback safe format
+                document.getElementById('latex-integral').innerText = `Int[${limitA.toFixed(1)}, ${limitB.toFixed(1)}] = ${exact.signed.toFixed(4)}`;
+            }
+
+            requestRedraw();
+        }
+
+        function updateLatexFormulaDisplay() {
+            try {
+                const node = math.parse(fExpression);
+                const tex = node.toTex();
+                katex.render(`f(x) = ${tex}`, document.getElementById('latex-formula'), {
+                    throwOnError: false,
+                    displayMode: true
+                });
+            } catch (e) {
+                document.getElementById('latex-formula').innerText = `f(x) = ${fExpression}`;
+            }
+        }
+
+        // 2D CANVAS COORDINATE SYSTEM MAPPINGS
+        function getCanvasWidth() { return canvas.width / (window.devicePixelRatio || 1); }
+        function getCanvasHeight() { return canvas.height / (window.devicePixelRatio || 1); }
+
+        function toScreenX(mathX) {
+            const w = getCanvasWidth();
+            return w / 2 + (mathX - centerX) * scaleX;
+        }
+
+        function toScreenY(mathY) {
+            const h = getCanvasHeight();
+            return h / 2 - (mathY - centerY) * scaleY;
+        }
+
+        function toMathX(screenX) {
+            const w = getCanvasWidth();
+            return centerX + (screenX - w / 2) / scaleX;
+        }
+
+        function toMathY(screenY) {
+            const h = getCanvasHeight();
+            return centerY - (screenY - h / 2) / scaleY;
+        }
+
+        // THE DRAW/RENDER GRAVITY ENGINE
+        function drawGraph() {
+            const width = getCanvasWidth();
+            const height = getCanvasHeight();
+            
+            // Clear Frame
+            ctx.fillStyle = COLORS.bg;
+            ctx.fillRect(0, 0, width, height);
+            
+            // Update HUD View Range Indicator
+            const mathMinX = toMathX(0);
+            const mathMaxX = toMathX(width);
+            document.getElementById('hud-scale-x').innerText = `[${mathMinX.toFixed(1)}, ${mathMaxX.toFixed(1)}]`;
+
+            // Draw Dynamic Coordinate Grid Lines
+            drawGrid(width, height);
+            
+            // Draw Main X and Y Axes
+            drawAxes(width, height);
+
+            // Shading Integration Area under function
+            if (compiledExpr) {
+                if (approxMethod === 'exact') {
+                    shadeExactArea();
+                } else {
+                    shadeApproximationArea();
+                }
+                
+                // Plot Function Curve
+                drawCurve(width);
+            }
+
+            // Draw Limit Markers a & b
+            drawLimits();
+
+            // Hover Coordinate Inspector Crosshair
+            if (mouseInCanvas && crosshairX !== null && compiledExpr) {
+                drawCrosshair();
+            }
+        }
+
+        // DRAW GRID LINES WITH COHERENT SCALING
+        function drawGrid(width, height) {
+            // Pick a dynamic scale based on scale pixels
+            const roughStep = 60 / scaleX; // Target 60px intervals
+            const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
+            const ratio = roughStep / magnitude;
+            
+            let step = magnitude;
+            if (ratio > 5) step = 5 * magnitude;
+            else if (ratio > 2) step = 2 * magnitude;
+
+            const mathLeft = toMathX(0);
+            const mathRight = toMathX(width);
+            const mathBottom = toMathY(height);
+            const mathTop = toMathY(0);
+
+            ctx.lineWidth = 1;
+            ctx.textBaseline = 'middle';
+            ctx.font = '10px Inter, sans-serif';
+
+            // Vertical Grid Lines & Ticks on X
+            const firstX = Math.floor(mathLeft / step) * step;
+            for (let x = firstX; x <= mathRight; x += step) {
+                const sx = toScreenX(x);
+                
+                // Grid line
+                ctx.strokeStyle = COLORS.gridLines;
+                ctx.beginPath();
+                ctx.moveTo(sx, 0);
+                ctx.lineTo(sx, height);
+                ctx.stroke();
+
+                // Draw Coordinate Number Label pinned to X axis or bottom
+                let labelY = toScreenY(0) + 12;
+                if (labelY < 12) labelY = 12;
+                if (labelY > height - 15) labelY = height - 15;
+
+                ctx.fillStyle = COLORS.text;
+                ctx.textAlign = 'center';
+                if (Math.abs(x) > 1e-9) {
+                    ctx.fillText(x.toFixed(x % 1 === 0 ? 0 : 2), sx, labelY);
+                }
+            }
+
+            // Horizontal Grid Lines & Ticks on Y
+            const firstY = Math.floor(mathBottom / step) * step;
+            for (let y = firstY; y <= mathTop; y += step) {
+                const sy = toScreenY(y);
+
+                ctx.strokeStyle = COLORS.gridLines;
+                ctx.beginPath();
+                ctx.moveTo(0, sy);
+                ctx.lineTo(width, sy);
+                ctx.stroke();
+
+                // Draw Coordinate Number Label pinned to Y axis or side
+                let labelX = toScreenX(0) - 10;
+                if (labelX < 10) labelX = 10;
+                if (labelX > width - 15) labelX = width - 15;
+
+                ctx.fillStyle = COLORS.text;
+                ctx.textAlign = 'right';
+                if (Math.abs(y) > 1e-9) {
+                    ctx.fillText(y.toFixed(y % 1 === 0 ? 0 : 2), labelX, sy);
+                }
+            }
+        }
+
+        // MAIN TRADITIONAL CARTESIAN AXES
+        function drawAxes(width, height) {
+            const sx0 = toScreenX(0);
+            const sy0 = toScreenY(0);
+
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = COLORS.axes;
+
+            // X-Axis
+            if (sy0 >= 0 && sy0 <= height) {
+                ctx.beginPath();
+                ctx.moveTo(0, sy0);
+                ctx.lineTo(width, sy0);
+                ctx.stroke();
+            }
+
+            // Y-Axis
+            if (sx0 >= 0 && sx0 <= width) {
+                ctx.beginPath();
+                ctx.moveTo(sx0, 0);
+                ctx.lineTo(sx0, height);
+                ctx.stroke();
+            }
+        }
+
+        // PERFECTLY FILL EXACT INTEGRATION AREA
+        function shadeExactArea() {
+            const startX = toScreenX(limitA);
+            const endX = toScreenX(limitB);
+            
+            const minSX = Math.min(startX, endX);
+            const maxSX = Math.max(startX, endX);
+            const sy0 = toScreenY(0);
+
+            // Integrate step-by-pixel column for maximum visual clarity
+            ctx.lineWidth = 1;
+            
+            for (let sx = Math.ceil(minSX); sx <= Math.floor(maxSX); sx++) {
+                const mx = toMathX(sx);
+                const my = evalF(mx);
+                if (isNaN(my) || !isFinite(my)) continue;
+
+                const sy = toScreenY(my);
+
+                // Set color depending on if value is positive or negative
+                if (my >= 0) {
+                    ctx.strokeStyle = COLORS.exactAreaPos;
+                } else {
+                    ctx.strokeStyle = COLORS.exactAreaNeg;
+                }
+
+                ctx.beginPath();
+                ctx.moveTo(sx, sy0);
+                ctx.lineTo(sx, sy);
+                ctx.stroke();
+            }
+
+            // Highlight border lines at boundaries
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(startX, sy0);
+            ctx.lineTo(startX, toScreenY(evalF(limitA)));
+            ctx.moveTo(endX, sy0);
+            ctx.lineTo(endX, toScreenY(evalF(limitB)));
+            ctx.stroke();
+        }
+
+        // RENDER APPROXIMATING SHADING BARRIER POLYS
+        function shadeApproximationArea() {
+            const h = (limitB - limitA) / subdivisionsN;
+            const sy0 = toScreenY(0);
+
+            for (let i = 0; i < subdivisionsN; i++) {
+                const x_start = limitA + i * h;
+                const x_end = limitA + (i + 1) * h;
+                
+                const sxStart = toScreenX(x_start);
+                const sxEnd = toScreenX(x_end);
+                
+                if (approxMethod === 'trapezoid') {
+                    // Trapezoidal requires polygons
+                    const y1 = evalF(x_start);
+                    const y2 = evalF(x_end);
+                    if (!isFinite(y1) || !isFinite(y2)) continue;
+
+                    const sy1 = toScreenY(y1);
+                    const sy2 = toScreenY(y2);
+
+                    const avgY = (y1 + y2) / 2;
+                    ctx.fillStyle = avgY >= 0 ? COLORS.riemannAreaPos : COLORS.riemannAreaNeg;
+                    ctx.strokeStyle = avgY >= 0 ? COLORS.riemannStrokePos : COLORS.riemannStrokeNeg;
+
+                    ctx.beginPath();
+                    ctx.moveTo(sxStart, sy0);
+                    ctx.lineTo(sxStart, sy1);
+                    ctx.lineTo(sxEnd, sy2);
+                    ctx.lineTo(sxEnd, sy0);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                } else {
+                    // Left, Right, or Midpoint Riemann Bars
+                    let evalPoint = x_start;
+                    if (approxMethod === 'right') evalPoint = x_end;
+                    if (approxMethod === 'midpoint') evalPoint = x_start + h / 2;
+
+                    const y = evalF(evalPoint);
+                    if (isNaN(y) || !isFinite(y)) continue;
+
+                    const sy = toScreenY(y);
+
+                    ctx.fillStyle = y >= 0 ? COLORS.riemannAreaPos : COLORS.riemannAreaNeg;
+                    ctx.strokeStyle = y >= 0 ? COLORS.riemannStrokePos : COLORS.riemannStrokeNeg;
+
+                    // Draw the Bar
+                    ctx.beginPath();
+                    ctx.rect(sxStart, Math.min(sy0, sy), sxEnd - sxStart, Math.abs(sy0 - sy));
+                    ctx.fill();
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+
+                    // Optional dot at height sample point
+                    const sxEval = toScreenX(evalPoint);
+                    ctx.fillStyle = y >= 0 ? '#06b6d4' : '#f43f5e';
+                    ctx.beginPath();
+                    ctx.arc(sxEval, sy, 3, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+            }
+        }
+
+        // PLOT HIGH-RESOLUTION FUNCTION CURVE
+        function drawCurve(width) {
+            ctx.save();
+            ctx.lineWidth = 3.5;
+            
+            // Neon Glow Shadow Effect
+            ctx.shadowColor = 'rgba(139, 92, 246, 0.4)';
+            ctx.shadowBlur = 8;
+
+            // Gradient Stroke for luxury visuals
+            const gradient = ctx.createLinearGradient(0, 0, width, 0);
+            gradient.addColorStop(0, COLORS.primaryCurve);
+            gradient.addColorStop(1, COLORS.primaryCurveEnd);
+            ctx.strokeStyle = gradient;
+
+            ctx.beginPath();
+            let isFirst = true;
+
+            // Iterate over every horizontal pixel to map complex functions exactly
+            for (let sx = 0; sx <= width; sx++) {
+                const mx = toMathX(sx);
+                const my = evalF(mx);
+
+                if (isNaN(my) || !isFinite(my)) {
+                    isFirst = true; // Break path on asymptotes / invalid values
+                    continue;
+                }
+
+                const sy = toScreenY(my);
+
+                if (isFirst) {
+                    ctx.moveTo(sx, sy);
+                    isFirst = false;
+                } else {
+                    // Handle high coordinates without breaking scaling limits
+                    if (Math.abs(sy) < 50000) {
+                        ctx.lineTo(sx, sy);
+                    }
+                }
+            }
+
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // DRAGGABLE LIMIT INTERFACE ELEMENTS
+        function drawLimits() {
+            const sy0 = toScreenY(0);
+            const h = getCanvasHeight();
+            
+            const limits = [
+                { id: 'a', val: limitA, label: 'a', color: COLORS.limitA },
+                { id: 'b', val: limitB, label: 'b', color: COLORS.limitB }
+            ];
+
+            limits.forEach(limit => {
+                const sx = toScreenX(limit.val);
+
+                // Dotted vertical limit line
+                ctx.lineWidth = 1.5;
+                ctx.strokeStyle = limit.color + '77'; // Semi-transparent
+                ctx.setLineDash([6, 6]);
+                ctx.beginPath();
+                ctx.moveTo(sx, 0);
+                ctx.lineTo(sx, h);
+                ctx.stroke();
+                ctx.setLineDash([]); // Reset dashed state
+
+                // Glow hover state
+                const isHovered = (hoverTarget === limit.id || dragTarget === limit.id);
+                const baseRad = isHovered ? 12 : 9;
+
+                // Handle boundary pin dot at X crossing point
+                ctx.save();
+                ctx.shadowColor = limit.color;
+                ctx.shadowBlur = isHovered ? 12 : 5;
+
+                // Outer Ring
+                ctx.fillStyle = limit.color;
+                ctx.beginPath();
+                ctx.arc(sx, sy0, baseRad, 0, 2 * Math.PI);
+                ctx.fill();
+
+                // Inner core
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(sx, sy0, baseRad * 0.45, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.restore();
+
+                // Drawing Flag/Tag directly above the axis dot
+                const flagY = sy0 - 24;
+                ctx.fillStyle = '#0f172a';
+                ctx.strokeStyle = limit.color;
+                ctx.lineWidth = 2;
+                
+                // Draw Pill Tag Shape
+                roundRect(ctx, sx - 16, flagY - 10, 32, 20, 6, true, true);
+
+                // Text centered inside pill
+                ctx.fillStyle = '#ffffff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.font = 'bold 11px Inter, sans-serif';
+                ctx.fillText(limit.label, sx, flagY);
+                
+                // Print micro coordinate label floating above handle
+                if (isHovered) {
+                    ctx.fillStyle = '#e2e8f0';
+                    ctx.font = '10px Inter, sans-serif';
+                    ctx.fillText(limit.val.toFixed(2), sx, flagY - 18);
+                }
+            });
+        }
+
+        // TOOLTIP COORDINATE HOVER INDICATOR
+        function drawCrosshair() {
+            const sx = toScreenX(crosshairX);
+            const sy = toScreenY(crosshairY);
+
+            // Dotted crosshair line
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = 'rgba(148, 163, 184, 0.25)';
+            ctx.setLineDash([4, 4]);
+            
+            ctx.beginPath();
+            ctx.moveTo(sx, 0);
+            ctx.lineTo(sx, getCanvasHeight());
+            ctx.moveTo(0, sy);
+            ctx.lineTo(getCanvasWidth(), sy);
+            ctx.stroke();
+            
+            ctx.setLineDash([]);
+
+            // Intersecting Node Dot
+            ctx.fillStyle = '#38bdf8';
+            ctx.beginPath();
+            ctx.arc(sx, sy, 5, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Label text coordinate box
+            ctx.save();
+            ctx.shadowColor = 'black';
+            ctx.shadowBlur = 10;
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 1.5;
+
+            const text = `(${crosshairX.toFixed(3)}, ${crosshairY.toFixed(3)})`;
+            ctx.font = '11px Inter, sans-serif';
+            const padding = 8;
+            const textWidth = ctx.measureText(text).width;
+            
+            const boxW = textWidth + padding * 2;
+            const boxH = 24;
+            const boxX = sx + 12 + boxW > getCanvasWidth() ? sx - 12 - boxW : sx + 12;
+            const boxY = sy - 12;
+
+            roundRect(ctx, boxX, boxY, boxW, boxH, 6, true, true);
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, boxX + padding, boxY + boxH / 2);
+            ctx.restore();
+        }
+
+        // CANVAS ROUNDED RECTANGLE UTILITY
+        function roundRect(ctx, x, y, width, height, radius, fill, stroke) {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            ctx.lineTo(x + radius, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+            if (fill) ctx.fill();
+            if (stroke) ctx.stroke();
+        }
+
+
+        // INTERACTIVE POINTER EVENTS SYSTEM
+        function getPointerPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            // Accommodate mouse or touches
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
+        // Detect if pointer is near interactive handle dots on the X Axis
+        function detectHandleHover(px, py) {
+            const sy0 = toScreenY(0);
+            
+            const distA = Math.hypot(px - toScreenX(limitA), py - sy0);
+            const distB = Math.hypot(px - toScreenX(limitB), py - sy0);
+
+            // Radius threshold to grab (25 pixels)
+            if (distA < 25 && distA < distB) {
+                return 'a';
+            } else if (distB < 25) {
+                return 'b';
+            }
+            return null;
+        }
+
+        // Mouse Down / Touch Start
+        function handlePointerDown(e) {
+            const pos = getPointerPos(e);
+            const hover = detectHandleHover(pos.x, pos.y);
+
+            if (hover) {
+                dragTarget = hover;
+            } else {
+                dragTarget = 'viewport'; // Start Panning view
+            }
+
+            lastMouseX = pos.x;
+            lastMouseY = pos.y;
+            
+            // Prevent scrolling on mobile drag
+            if (e.cancelable) e.preventDefault();
+        }
+
+        // Mouse Move / Touch Move
+        function handlePointerMove(e) {
+            const pos = getPointerPos(e);
+            
+            // Handle hover indicators when not dragging
+            if (!dragTarget) {
+                hoverTarget = detectHandleHover(pos.x, pos.y);
+                if (hoverTarget) {
+                    canvas.style.cursor = 'ew-resize';
+                } else {
+                    canvas.style.cursor = 'grab';
+                }
+
+                // Update Inspector Crosshair coords
+                crosshairX = toMathX(pos.x);
+                crosshairY = evalF(crosshairX);
+                requestRedraw();
+            } else {
+                // Adjust drags
+                if (dragTarget === 'a') {
+                    let mx = toMathX(pos.x);
+                    // Constraint limits within grid limits safely
+                    limitA = Math.max(-20, Math.min(20, mx));
+                    syncBoundsUI();
+                    recalculateAndRender();
+                } else if (dragTarget === 'b') {
+                    let mx = toMathX(pos.x);
+                    limitB = Math.max(-20, Math.min(20, mx));
+                    syncBoundsUI();
+                    recalculateAndRender();
+                } else if (dragTarget === 'viewport') {
+                    // Pan calculations
+                    const dx = pos.x - lastMouseX;
+                    const dy = pos.y - lastMouseY;
+
+                    centerX -= dx / scaleX;
+                    centerY += dy / scaleY;
+
+                    lastMouseX = pos.x;
+                    lastMouseY = pos.y;
+                    
+                    canvas.style.cursor = 'grabbing';
+                    requestRedraw();
+                }
+            }
+
+            if (e.cancelable) e.preventDefault();
+        }
+
+        // Mouse Up / Touch End
+        function handlePointerUp() {
+            dragTarget = null;
+            canvas.style.cursor = hoverTarget ? 'ew-resize' : 'grab';
+            requestRedraw();
+        }
+
+        // Connect Canvas Interaction Events
+        canvas.addEventListener('mousedown', handlePointerDown);
+        canvas.addEventListener('mousemove', handlePointerMove);
+        window.addEventListener('mouseup', handlePointerUp);
+
+        canvas.addEventListener('touchstart', handlePointerDown, { passive: false });
+        canvas.addEventListener('touchmove', handlePointerMove, { passive: false });
+        window.addEventListener('touchend', handlePointerUp);
+
+        canvas.addEventListener('mouseenter', () => {
+            mouseInCanvas = true;
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            mouseInCanvas = false;
+            crosshairX = null;
+            crosshairY = null;
+            requestRedraw();
+        });
+
+        // ZOOM CONTROLLER centered on pointer
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            const zoomFactor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+            zoomAtCoordinate(mouseX, mouseY, zoomFactor);
+        }, { passive: false });
+
+        function zoomAtCoordinate(screenX, screenY, zoomFactor) {
+            // Pick mathematical coordinate currently under cursor
+            const mathX = toMathX(screenX);
+            const mathY = toMathY(screenY);
+
+            scaleX = Math.max(5, Math.min(2000, scaleX * zoomFactor));
+            scaleY = Math.max(5, Math.min(2000, scaleY * zoomFactor));
+
+            // Move viewport center so that math coord stays stationary in screen coordinates
+            centerX = mathX - (screenX - getCanvasWidth() / 2) / scaleX;
+            centerY = mathY + (screenY - getCanvasHeight() / 2) / scaleY;
+
+            requestRedraw();
+        }
+
+        function zoom(factor) {
+            const w = getCanvasWidth();
+            const h = getCanvasHeight();
+            zoomAtCoordinate(w / 2, h / 2, factor);
+        }
+
+        function resetViewport() {
+            centerX = 0.0;
+            centerY = 0.0;
+            scaleX = 45.0;
+            scaleY = 45.0;
+            requestRedraw();
+        }
+
+
+        // UI BINDING INPUT ADJUSTERS
+        function handleFunctionInput(value) {
+            fExpression = value;
+            if (compileExpression(fExpression)) {
+                updateLatexFormulaDisplay();
+                recalculateAndRender();
+            }
+        }
+
+        function handleBoundSliderInput(bound, value) {
+            const numeric = parseFloat(value);
+            if (bound === 'a') {
+                limitA = numeric;
+                document.getElementById('input-a').value = numeric.toFixed(2);
+            } else {
+                limitB = numeric;
+                document.getElementById('input-b').value = numeric.toFixed(2);
+            }
+            recalculateAndRender();
+        }
+
+        function handleBoundNumberInput(bound, value) {
+            let numeric = parseFloat(value);
+            if (isNaN(numeric)) return;
+
+            // Expand slider boundary range if user specifies beyond bounds
+            const slider = document.getElementById(`slider-${bound}`);
+            const min = parseFloat(slider.min);
+            const max = parseFloat(slider.max);
+
+            if (numeric < min) {
+                slider.min = Math.floor(numeric - 5);
+            }
+            if (numeric > max) {
+                slider.max = Math.ceil(numeric + 5);
+            }
+
+            if (bound === 'a') {
+                limitA = numeric;
+                slider.value = numeric;
+            } else {
+                limitB = numeric;
+                slider.value = numeric;
+            }
+            recalculateAndRender();
+        }
+
+        function adjustBound(bound, step) {
+            if (bound === 'a') {
+                limitA = parseFloat((limitA + step).toFixed(2));
+            } else {
+                limitB = parseFloat((limitB + step).toFixed(2));
+            }
+            syncBoundsUI();
+            recalculateAndRender();
+        }
+
+        function swapLimits() {
+            const temp = limitA;
+            limitA = limitB;
+            limitB = temp;
+            syncBoundsUI();
+            recalculateAndRender();
+        }
+
+        function handleIntervalSliderInput(value) {
+            subdivisionsN = parseInt(value);
+            document.getElementById('label-intervals').innerText = `n = ${subdivisionsN}`;
+            recalculateAndRender();
+        }
+
+        // SYNCHRONIZE JS STATE TO DOM ELEMENTS
+        function syncBoundsUI() {
+            document.getElementById('input-a').value = limitA.toFixed(2);
+            document.getElementById('slider-a').value = limitA;
+            document.getElementById('input-b').value = limitB.toFixed(2);
+            document.getElementById('slider-b').value = limitB;
+        }
+
+        // INTERACTIVE SWITCH BETWEEN MODE APPROXIMATIONS
+        function setApproximationMethod(method) {
+            approxMethod = method;
+            
+            const btnExact = document.getElementById('mode-exact');
+            const btnRiemann = document.getElementById('mode-riemann');
+            const riemannConfig = document.getElementById('riemann-config');
+
+            // Set UI headers
+            if (method === 'exact') {
+                btnExact.className = "px-3 py-1.5 rounded-md font-medium transition-all duration-200 bg-brand-600 text-white";
+                btnRiemann.className = "px-3 py-1.5 rounded-md font-medium transition-all duration-200 text-slate-400 hover:text-white";
+                riemannConfig.classList.add('hidden');
+            } else {
+                btnExact.className = "px-3 py-1.5 rounded-md font-medium transition-all duration-200 text-slate-400 hover:text-white";
+                btnRiemann.className = "px-3 py-1.5 rounded-md font-medium transition-all duration-200 bg-brand-600 text-white";
+                riemannConfig.classList.remove('hidden');
+            }
+
+            // Highlight sub-type button inside config panel
+            const approximationSubtypes = ['left', 'right', 'midpoint', 'trapezoid'];
+            approximationSubtypes.forEach(type => {
+                const button = document.getElementById(type === 'trapezoid' ? 'btn-trapezoid' : `btn-${type}-riemann`);
+                if (button) {
+                    if (method === type) {
+                        button.classList.add('bg-brand-600', 'text-white', 'border-brand-500');
+                        button.classList.remove('bg-slate-900', 'text-slate-300', 'border-slate-800');
+                    } else {
+                        button.classList.remove('bg-brand-600', 'text-white', 'border-brand-500');
+                        button.classList.add('bg-slate-900', 'text-slate-300', 'border-slate-800');
+                    }
+                }
+            });
+
+            recalculateAndRender();
+        }
+
+        // PRESET EQUATION VALUES LOADER
+        const PRESETS = {
+            parabola: { expr: "x^2 - 1", a: -2.0, b: 2.0, cx: 0, cy: 0, sc: 45 },
+            sine: { expr: "2 * sin(x)", a: 0.0, b: Math.PI, cx: 2.0, cy: 0, sc: 50 },
+            gaussian: { expr: "3 * exp(-x^2)", a: -1.5, b: 1.5, cx: 0, cy: 1.2, sc: 65 },
+            cubic: { expr: "0.1 * x^3 - x", a: -3.16, b: 3.16, cx: 0, cy: 0, sc: 40 },
+            damped: { expr: "3 * exp(-0.15*x) * cos(x)", a: 0.0, b: 6.28, cx: 3.5, cy: 0.8, sc: 40 },
+            polynomial: { expr: "0.05*x^4 - x^2 + 2", a: -3.0, b: 3.0, cx: 0, cy: 1.0, sc: 35 }
+        };
+
+        function loadPreset(key) {
+            const data = PRESETS[key];
+            if (!data) return;
+
+            // Update inputs
+            fExpression = data.expr;
+            document.getElementById('function-input').value = data.expr;
+            
+            limitA = data.a;
+            limitB = data.b;
+            syncBoundsUI();
+
+            // Refocus graph camera context
+            centerX = data.cx;
+            centerY = data.cy;
+            scaleX = data.sc;
+            scaleY = data.sc;
+
+            // Re-render
+            compileExpression(fExpression);
+            updateLatexFormulaDisplay();
+            recalculateAndRender();
+        }
+
+    </script>
+</body>
+</html>
